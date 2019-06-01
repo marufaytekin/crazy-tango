@@ -23,8 +23,9 @@ class Task(object):
 
         if children is None:
             children = []
-
         self.children = children
+        self.size = len(children)
+        self.head = 0
 
     def __str__(self):
         return self.name
@@ -40,15 +41,24 @@ class Task(object):
 
     def add_child(self, c):
         self.children.append(c)
+        self.size += 1
 
     def remove_child(self, c):
         self.children.remove(c)
+        self.size -= 1
 
     def prepend_child(self, c):
         self.children.insert(0, c)
+        self.size += 1
 
     def insert_child(self, c, i):
         self.children.insert(i, c)
+        self.size += 1
+
+    def get_next(self):
+        item = self.children[self.head % self.size]  # circular queue behaviour
+        self.head = (self.head + 1) % self.size
+        return item
 
     def get_status(self):
         return self.status
@@ -121,13 +131,13 @@ class Sequence(Task):
     def __init__(self, name, *args, **kwargs):
         super(Sequence, self).__init__(name, *args, **kwargs)
 
-    def next_move(self):
+    def next_task(self):
         if len(self.children) > 0:
-            c = self.children.pop(0)
+            c = self.get_next()
             if isinstance(c, Task):
                 return c
             elif isinstance(c, Sequence):
-                return c.next_move()
+                return c.get_next()
         else:
             return None
 
@@ -249,92 +259,16 @@ class Wait(Task):
         super(Wait, self).__init__(name, *args, **kwargs)
         self._interval = interval
 
+    def set_interval(self, interval):
+        self._interval = interval
+
     def run(self):
         if self._announce:
             self.announce()
+        log.debug("task_name: " + self.name + ", wait interval: " + str(self._interval))
         time.sleep(self._interval)
 
         return TaskStatus.SUCCESS
-
-
-class Limit(Task):
-    """
-        Limit the number of times a task can execute
-    """
-
-    def __init__(self, name, announce=True, *args, **kwargs):
-        super(Limit, self).__init__(name, *args, **kwargs)
-
-        self.max_executions = kwargs['max_executions']
-        self._announce = announce
-        self.execution_count = 0
-        self.name = name
-        log.info("Limit number of executions to: " + str(self.max_executions))
-
-    def run(self):
-        c = self.children[0]
-        if self.execution_count >= self.max_executions:
-            if self._announce:
-                log.info(self.name + " reached maximum number (" + str(self.max_executions) + ") of executions.")
-            if self.reset_after:
-                self.reset()
-            return TaskStatus.FAILURE
-        c.status = c.run()
-        if c.status != TaskStatus.RUNNING:
-            self.execution_count += 1
-        return c.status
-
-    def reset(self):
-        c = self.children[0]
-        c.reset()
-        self.execution_count = 0
-        self.status = None
-
-
-class ParallelOne(Task):
-    """
-    A parallel task runs each child task  at (roughly) the same time.
-    The ParallelOne task returns success as soon as any child succeeds.
-    """
-
-    def __init__(self, name, *args, **kwargs):
-        super(ParallelOne, self).__init__(name, *args, **kwargs)
-
-    def run(self):
-        for c in self.children:
-            c.status = c.run()
-            if c.status == TaskStatus.SUCCESS:
-                if self.reset_after:
-                    self.reset()
-                return TaskStatus.SUCCESS
-        if self.reset_after:
-            self.reset()
-
-        return TaskStatus.FAILURE
-
-
-class ParallelAll(Task):
-    """
-    A parallel task runs each child task at (roughly) the same time.
-    The ParallelAll task requires all subtasks to succeed for it to succeed.
-    """
-
-    def __init__(self, name, *args, **kwargs):
-        super(ParallelAll, self).__init__(name, *args, **kwargs)
-
-    def run(self):
-        n_success = 0
-        n_children = len(self.children)
-        for c in self.children:
-            c.status = c.run()
-            if c.status == TaskStatus.SUCCESS:
-                n_success += 1
-            if c.status == TaskStatus.FAILURE:
-                return TaskStatus.FAILURE
-            if n_success == n_children:
-                return TaskStatus.SUCCESS
-            else:
-                return TaskStatus.RUNNING
 
 
 class CallbackTask(Task):
