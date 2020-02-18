@@ -42,7 +42,7 @@ if __name__ == '__main__':
     if simulate:
         dance = tango.pattern(MC, 0.15, 0.9, announce=True)
         dance = tango.pattern(MC, 0.5, 0.9, announce=True)
-        music.play("LaCumparsita.mp3", handle_beat, 0)
+        music.play("music/LaCumparsita.mp3", handle_beat, 0)
     else:
         with SyncCrazyflie(URI, cf=Crazyflie(rw_cache='./cache')) as scf:
             with MotionCommander(scf) as mc:
@@ -51,7 +51,7 @@ if __name__ == '__main__':
                 dance = tango.pattern(mc, 0.15, 0.9, announce=True)
                 # dance = TurnFullLeft("TurnFullLeft", mc, 0.5, 0.5, announce=True)
                 # dance = tango.dance_tango("Tango", mc, 0.3, 0.9, announce=False)
-                t = threading.Thread(target=music.play, args=("LaCumparsita.mp3", handle_beat, 0))
+                t = threading.Thread(target=music.play, args=("music/LaCumparsita.mp3", handle_beat, 0))
                 t.start()
                 t.join()
                 mc.land(0.3)
